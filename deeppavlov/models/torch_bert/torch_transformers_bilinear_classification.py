@@ -89,6 +89,7 @@ class BilinearClassification(nn.Module):
     def forward(self, input_ids, attention_mask, entity_subw_indices, triplet_entity_nums, labels = None):
         logits = self.get_logits(input_ids, attention_mask, entity_subw_indices, triplet_entity_nums)
         if labels is not None:
+            labels = [[int(elem)] if type(elem) != list else elem for elem in labels]
             labels_len = [len(elem) for elem in labels]
             max_len = max(labels_len)
             token_attention_mask = [[0 for _ in range(max_len)] for _ in labels]
@@ -149,8 +150,8 @@ class TorchTransformersBilinearClassification(TorchModel):
             return_probas=return_probas,
             **kwargs)
 
-    def train_on_batch(self, input_ids_batch, attention_mask_batch, entity_subw_indices_batch,
-                             triplet_entity_nums_batch, labels):
+    def train_on_batch(self, input_ids_batch, attention_mask_batch, entity_subw_indices_batch, labels):
+        triplet_entity_nums_batch = [[[0, 1]] for _ in range(len(entity_subw_indices_batch))]
         _input = {'entity_subw_indices': entity_subw_indices_batch, "triplet_entity_nums": triplet_entity_nums_batch}
         _input["input_ids"] = torch.LongTensor(input_ids_batch).to(self.device)
         _input["attention_mask"] = torch.LongTensor(attention_mask_batch).to(self.device)
@@ -173,8 +174,8 @@ class TorchTransformersBilinearClassification(TorchModel):
 
         return loss.item()
 
-    def __call__(self, input_ids_batch, attention_mask_batch, entity_subw_indices_batch, triplet_entity_nums_batch):
-
+    def __call__(self, input_ids_batch, attention_mask_batch, entity_subw_indices_batch):
+        triplet_entity_nums_batch = [[[0, 1]] for _ in range(len(entity_subw_indices_batch))]
         self.model.eval()
         _input = {'entity_subw_indices': entity_subw_indices_batch, "triplet_entity_nums": triplet_entity_nums_batch}
         _input["input_ids"] = torch.LongTensor(input_ids_batch).to(self.device)
@@ -189,7 +190,7 @@ class TorchTransformersBilinearClassification(TorchModel):
         logits = logits.detach().cpu().numpy()
         pred = np.argmax(logits, axis=-1)
         seq_lengths = [len(elem) for elem in entity_subw_indices_batch]
-        pred = [p[:l] for l, p in zip(seq_lengths, pred)]
+        pred = [p[:l][0] for l, p in zip(seq_lengths, pred)]
 
         if self.return_probas:
             return pred, probas

@@ -1,83 +1,82 @@
 {
   "dataset_reader": {
-    "class_name": "sq_reader",
-    "data_path": "{DOWNLOADS_PATH}/superglue/wic.json"
+    "class_name": "huggingface_dataset_reader",
+    "path": "{COMPETITION}",
+    "name": "{TASK}",
+    "train": "train",
+    "valid": "validation",
+    "test": "test"
   },
   "dataset_iterator": {
-    "class_name": "data_learning_iterator"
+    "class_name": "huggingface_dataset_iterator",
+    "features": ["sentence1", "sentence2", "start1", "start2", "end1", "end2"],
+    "label": "label",
+    "seed": 42
   },
   "chainer": {
-    "in": ["texts", "texts2", "tok_indices", "pair_words"],
-    "in_y": ["labels"],
+    "in": ["sentence1", "sentence2", "start1", "start2", "end1", "end2"],
+    "in_y": ["label"],
     "pipe": [
       {
-        "in": ["texts", "tok_indices", "texts2"],
-        "out": ["input_ids", "attention_mask", "entity_subw_indices"],
         "class_name": "torch_transformers_entity_spans_preprocessor",
+        "vocab_file": "{BASE_MODEL}",
+        "do_lower_case": false,
         "max_seq_length": 512,
-        "vocab_file": "{TRANSFORMER}",
-        "do_lower_case": false
+        "in": ["sentence1", "start1", "end1", "sentence2", "start2", "end2"],
+        "out": ["input_ids", "attention_mask", "entity_subw_indices"]
       },
       {
         "id": "tag_vocab",
         "class_name": "simple_vocab",
+        "fit_on": ["label"],
         "unk_token": ["O"],
         "pad_with_zeros": true,
         "save_path": "{MODEL_PATH}/tag.dict",
         "load_path": "{MODEL_PATH}/tag.dict",
-        "fit_on": ["labels"],
-        "in": ["labels"],
-        "out": ["labels_ind"]
+        "in": ["label"],
+        "out": ["y_ids"]
       },
       {
         "class_name": "torch_transformers_bilinear_classification",
-        "in": ["input_ids", "attention_mask", "entity_subw_indices", "pair_words"],
-        "in_y": ["labels_ind"],
-        "out": ["labels_pred_ind"],
+        "return_probas": false,
+        "pretrained_bert": "{BASE_MODEL}",
         "save_path": "{MODEL_PATH}/model",
         "load_path": "{MODEL_PATH}/model",
         "n_tags": "#tag_vocab.len",
-        "pretrained_bert": "{TRANSFORMER}",
         "learning_rate_drop_patience": 6,
         "learning_rate_drop_div": 1.5,
-        "return_probas": false
+        "in": ["input_ids", "attention_mask", "entity_subw_indices"],
+        "in_y": ["y_ids"],
+        "out": ["y_pred_ids"]
       },
       {
-        "ref": "tag_vocab",
-        "in": ["labels_pred_ind"],
-        "out": ["labels_pred"]
+        "in": ["y_pred_ids"],
+        "out": ["y_pred_labels"],
+        "ref": "tag_vocab"
       }
     ],
-    "out": ["labels_pred"]
+    "out": ["y_pred_labels"]
   },
   "train": {
-    "epochs": 50,
     "batch_size": 10,
     "metrics": ["f1_macro", "accuracy"],
+    "epochs": 50,
     "validation_patience": 30,
     "val_every_n_batches": 200,
     "log_every_n_batches": 50,
-    "evaluation_targets": ["valid", "train"],
     "show_examples": false,
+    "evaluation_targets": ["valid", "train"],
     "class_name": "torch_trainer"
   },
   "metadata": {
     "variables": {
+      "BASE_MODEL": "bert-base-cased",
       "ROOT_PATH": "~/.deeppavlov",
       "DOWNLOADS_PATH": "{ROOT_PATH}/downloads",
       "MODELS_PATH": "{ROOT_PATH}/models",
-      "TRANSFORMER": "bert-base-cased",
-      "MODEL_PATH": "{MODELS_PATH}/classifiers/wic_bilinear_classifier_bert"
-      },
-      "download": [
-        {
-          "url": "http://files.deeppavlov.ai/tmp/wic.tar.gz",
-          "subdir": "{DOWNLOADS_PATH}/superglue"
-        },
-        {
-          "url": "http://files.deeppavlov.ai/tmp/wic_bilinear_classifier_bert.tar.gz",
-          "subdir": "{MODELS_PATH}/classifiers/wic_bilinear_classifier_bert"
-        }
-    ]
+      "COMPETITION": "super_glue",
+      "TASK": "wic",
+      "MODEL_PATH": "{MODELS_PATH}/{COMPETITION}/{TASK}/{BASE_MODEL}"
+    }
   }
 }

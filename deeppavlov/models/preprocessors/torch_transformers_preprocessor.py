@@ -278,14 +278,17 @@ class TorchTransformersEntitySpansPreprocessor(Component):
         self.sep_token = sep_token
         self.log_flag = log_flag
 
-    def __call__(self, texts_batch, entity_offsets_batch, texts2_batch=None):
+    def __call__(self, texts_a, starts_a, ends_a, texts_b=None, starts_b=None, ends_b=None):
         token_ids_batch, attention_mask_batch, subw_tokens_batch, entity_subw_indices_batch = [], [], [], []
-        if texts2_batch is None:
-            texts2_batch = ["" for _ in texts_batch]
+        if texts_b is None:
+            texts_b = ["" for _ in texts_a]
 
-        for text, text2, entity_offsets_list in zip(texts_batch, texts2_batch, entity_offsets_batch):
+        spans_a = [list(span) for span in zip(starts_a, ends_a)]
+        spans_b = [list(span) for span in zip(starts_b, ends_b)]
+        for text, text2, span, span2 in zip(texts_a, texts_b, spans_a, spans_b):
             if text2:
-                text = f"{text} [SEP] {text2}"
+                span2 = [idx + len(f"{text} {self.sep_token} ") for idx in span2]
+                text = f"{text} {self.sep_token} {text2}"
             tokens_list = []
             tokens_offsets_list = []
             for elem in re.finditer(self._re_tokenizer, text):
@@ -294,7 +297,7 @@ class TorchTransformersEntitySpansPreprocessor(Component):
             if self.do_lower_case:
                 tokens_list = [tok.lower() for tok in tokens_list]
             entity_indices_list = []
-            for start_offset, end_offset in entity_offsets_list:
+            for start_offset, end_offset in [span, span2]:
                 entity_indices = []
                 for ind, (start_tok_offset, end_tok_offset) in enumerate(tokens_offsets_list):
                     if start_tok_offset >= start_offset and end_tok_offset <= end_offset:
