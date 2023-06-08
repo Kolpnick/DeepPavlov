@@ -58,6 +58,10 @@ class SimpleVocabulary(Estimator):
         self.unk_token = unk_token
         self.freq_drop_load = freq_drop_load
         self.reset()
+        if 'id2label' in kwargs.keys():
+            for idx, label in kwargs['id2label'].items():
+                self._t2i[label] = idx
+                self._i2t.append(label)
         if self.load_path:
             self.load()
 
