@@ -41,6 +41,10 @@
       {
         "id": "classes_vocab",
         "class_name": "simple_vocab",
+        "id2label": {
+          "0": "entailment",
+          "1": "not_entailment"
+        },
         "fit_on": [
           "y"
         ],
